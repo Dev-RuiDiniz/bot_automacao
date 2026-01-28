@@ -1,41 +1,58 @@
 using System;
 using System.Drawing;
-using System.Runtime.Versioning; // Necessário para o atributo de plataforma
+using System.Drawing.Imaging;
 using OpenCvSharp;
 using OpenCvSharp.Extensions;
 
 namespace AutomacaoApp.Core
 {
-    // Informamos ao compilador que esta classe foi feita especificamente para Windows
-    [SupportedOSPlatform("windows")]
     public class VisionEngine
     {
-        private readonly double _threshold;
-
-        public VisionEngine(double threshold = 0.8)
+        /// <summary>
+        /// Busca um elemento na tela com ajuste dinâmico de precisão.
+        /// </summary>
+        /// <param name="screen">Captura atual da tela.</param>
+        /// <param name="template">Imagem do asset a ser buscado.</param>
+        /// <param name="initialThreshold">Precisão inicial (Padrão: 0.9 ou 90%).</param>
+        /// <returns>Coordenadas do centro do elemento ou null.</returns>
+        public System.Drawing.Point? FindElement(Bitmap screen, Bitmap template, double initialThreshold = 0.9)
         {
-            _threshold = threshold;
-        }
-
-        public System.Drawing.Point? FindElement(Bitmap screenSource, Bitmap template)
-        {
-            // Agora o aviso CA1416 desaparece pois o método está "protegido" pelo atributo da classe
-            using var matSource = BitmapConverter.ToMat(screenSource);
+            // Converte Bitmaps para Mat (formato OpenCV)
+            using var matScreen = BitmapConverter.ToMat(screen);
             using var matTemplate = BitmapConverter.ToMat(template);
-            using var result = new Mat();
+            using var res = new Mat();
 
-            Cv2.MatchTemplate(matSource, matTemplate, result, TemplateMatchModes.CCoeffNormed);
-            Cv2.MinMaxLoc(result, out _, out double maxVal, out _, out OpenCvSharp.Point maxLoc);
+            // Executa o MatchTemplate
+            Cv2.MatchTemplate(matScreen, matTemplate, res, TemplateMatchModes.CCoeffNormed);
+            
+            double minVal, maxVal;
+            OpenCvSharp.Point minLoc, maxLoc;
+            Cv2.MinMaxLoc(res, out minVal, out maxVal, out minLoc, out maxLoc);
 
-            if (maxVal >= _threshold)
+            // 1ª Tentativa: Threshold rigoroso (evita falsos positivos)
+            if (maxVal >= initialThreshold)
             {
-                return new System.Drawing.Point(
-                    maxLoc.X + (matTemplate.Cols / 2), 
-                    maxLoc.Y + (matTemplate.Rows / 2)
-                );
+                return GetCenterPoint(maxLoc, template.Width, template.Height);
             }
 
-            return null;
+            // 2ª Tentativa (Dinâmica): Se falhou, tentamos com 0.75 (75% de confiança)
+            double fallbackThreshold = initialThreshold - 0.15;
+            if (maxVal >= fallbackThreshold)
+            {
+                // Log opcional via injeção de dependência se necessário: 
+                // "Elemento encontrado com confiança reduzida: " + maxVal
+                return GetCenterPoint(maxLoc, template.Width, template.Height);
+            }
+
+            return null; // Elemento realmente não está na tela
+        }
+
+        private System.Drawing.Point GetCenterPoint(OpenCvSharp.Point location, int width, int height)
+        {
+            return new System.Drawing.Point(
+                location.X + (width / 2),
+                location.Y + (height / 2)
+            );
         }
     }
 }

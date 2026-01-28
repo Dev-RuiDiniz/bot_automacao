@@ -9,7 +9,6 @@ namespace AutomacaoApp.Models
         public Guid Id { get; private set; }
         public string Name { get; set; }
         
-        // SOLUÇÃO CS1061: Atalho para o Program.cs conseguir ler o nome
         public string InstanceName => Name; 
 
         public BotState Status { get; set; }
