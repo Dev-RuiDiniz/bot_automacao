@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Threading;
@@ -27,140 +26,86 @@ namespace AutomacaoApp.Services
         }
 
         /// <summary>
-        /// Inicia o Chrome, maximiza e valida a interface gráfica inicial.
+        /// Valida se o navegador Chrome (Android) está aberto dentro do MEmu.
         /// </summary>
-        public void OpenBrowser(string url = "about:blank")
+        public void EnsureBrowserOpen()
         {
-            _bot.Log($"Abrindo Chrome em: {url}");
+            _bot.Log("--- Validando Chrome no Emulador ---");
 
-            try
+            using var screen = CaptureScreen();
+            
+            // Procura o asset da barra de endereços do Chrome Mobile
+            if (FindAsset(screen, "chrome.android_barra_endereco.png") == null)
             {
-                Process.Start(new ProcessStartInfo
+                _bot.Log("Chrome não detectado na frente. Tentando abrir via ícone...");
+                if (!DetectAndClick(screen, "chrome.android_icone.png", "Ícone Chrome"))
                 {
-                    FileName = "chrome.exe",
-                    Arguments = $"{url} --start-maximized --disable-notifications",
-                    UseShellExecute = true
-                });
-
-                if (WaitForBrowserReady())
-                {
-                    _bot.Log("Chrome carregado e barra de endereço validada.");
+                    throw new CriticalException("Não foi possível localizar o Chrome no menu do emulador.");
                 }
-                else
-                {
-                    throw new LightException("O Chrome abriu, mas a interface (barra de endereço) não foi localizada.");
-                }
-            }
-            catch (Exception ex)
-            {
-                _bot.Log($"Erro ao iniciar navegador: {ex.Message}");
-                throw new CriticalException("Falha crítica ao abrir o Google Chrome.");
+                Thread.Sleep(4000); // Aguarda abertura do app
             }
         }
 
         /// <summary>
-        /// Navega para uma URL específica limpando a barra de endereços detectada.
+        /// Navega para a URL usando a interface do Chrome Mobile.
         /// </summary>
-        public void NavigateToUrl(string url)
+        public void NavigateInAndroid(string url)
         {
             _bot.Log($"Navegando para: {url}");
 
             using var screen = CaptureScreen();
-            var location = FindAssetOnScreen(screen, "chrome.chrome_barra_endereco.png");
+            var bar = FindAsset(screen, "chrome.android_barra_endereco.png");
 
-            if (location != null)
+            if (bar != null)
             {
-                // Foco e Sanitização
-                ClickAt(location.Value.X, location.Value.Y);
-                Thread.Sleep(500);
-                
-                _input.Keyboard.ModifiedKeyStroke(VirtualKeyCode.CONTROL, VirtualKeyCode.VK_A);
-                Thread.Sleep(200);
+                // 1. Clica na barra para abrir o teclado do Android
+                ClickAt(bar.Value.X, bar.Value.Y);
+                Thread.Sleep(800);
+
+                // 2. No Android, clicar na barra geralmente já seleciona tudo. 
+                // Usamos BACKSPACE por segurança para limpar.
                 _input.Keyboard.KeyPress(VirtualKeyCode.BACK);
-                
-                // Entrada da URL
+                Thread.Sleep(200);
+
+                // 3. Digita a URL e pressiona ENTER
                 _input.Keyboard.TextEntry(url);
                 _input.Keyboard.KeyPress(VirtualKeyCode.RETURN);
 
-                _bot.Log("URL enviada. Aguardando processamento...");
-                Thread.Sleep(5000); // Tempo para o servidor começar a responder
-            }
-            else
-            {
-                throw new LightException("Falha ao localizar barra de endereço para navegação.");
+                _bot.Log("Aguardando carregamento da página mobile...");
+                Thread.Sleep(6000);
             }
         }
 
         /// <summary>
-        /// Valida se o site carregou corretamente buscando um elemento visual único (Ex: Logo).
+        /// Monitor de carregamento para a página de bônus dentro do navegador mobile.
         /// </summary>
-        public bool ValidateSite(string assetName)
+        public bool WaitForWebBonus()
         {
-            _bot.Log($"Validando site via: {assetName}");
+            _bot.Log("Monitorando renderização da página de bônus...");
             
             int attempts = 0;
-            const int MAX_LOAD_WAIT = 15;
+            const int MAX_WAIT = 15;
+            // Asset de um elemento único da página web (ex: botão de claim ou logo do site)
+            string assetName = "chrome.android_bonus_pronto.png";
 
-            while (attempts < MAX_LOAD_WAIT)
+            while (attempts < MAX_WAIT)
             {
                 using var screen = CaptureScreen();
-                if (FindAssetOnScreen(screen, assetName) != null)
+                if (FindAsset(screen, assetName) != null)
                 {
-                    _bot.Log("Site validado com sucesso.");
+                    _bot.Log("Página de bônus mobile carregada!");
                     return true;
                 }
 
-                Thread.Sleep(1000);
+                Thread.Sleep(1500);
                 attempts++;
             }
-
             return false;
         }
 
-        /// <summary>
-        /// Realiza o preenchimento de credenciais em campos detectados visualmente.
-        /// </summary>
-        public void FillLoginForm(string user, string pass)
-        {
-            _bot.Log("Preenchendo formulário de login...");
+        // --- MOTOR DE INTERAÇÃO (OTIMIZADO PARA EMULADOR) ---
 
-            // Preencher Usuário
-            if (DetectAndClickInsideWeb("site.campo_usuario.png", "Campo Usuário"))
-            {
-                _input.Keyboard.TextEntry(user);
-                Thread.Sleep(600);
-            }
-
-            // Preencher Senha
-            if (DetectAndClickInsideWeb("site.campo_senha.png", "Campo Senha"))
-            {
-                _input.Keyboard.TextEntry(pass);
-                Thread.Sleep(600);
-            }
-
-            // Clique no botão de confirmação
-            DetectAndClickInsideWeb("site.botao_login.png", "Botão Login");
-        }
-
-        // --- MÉTODOS AUXILIARES DE MOTOR ---
-
-        private bool DetectAndClickInsideWeb(string assetName, string label)
-        {
-            using var screen = CaptureScreen();
-            var location = FindAssetOnScreen(screen, assetName);
-
-            if (location != null)
-            {
-                _bot.Log($"Elemento encontrado: {label}");
-                ClickAt(location.Value.X, location.Value.Y);
-                Thread.Sleep(400); // Aguarda o campo ganhar foco
-                return true;
-            }
-            _bot.Log($"[AVISO] Elemento não encontrado: {label}");
-            return false;
-        }
-
-        private Point? FindAssetOnScreen(Bitmap screen, string assetName)
+        private Point? FindAsset(Bitmap screen, string assetName)
         {
             string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "assets", assetName);
             if (!File.Exists(path)) return null;
@@ -169,16 +114,14 @@ namespace AutomacaoApp.Services
             return _vision.FindElement(screen, template);
         }
 
-        private bool WaitForBrowserReady()
+        private bool DetectAndClick(Bitmap screen, string assetName, string label)
         {
-            int attempts = 0;
-            while (attempts < 12)
+            var location = FindAsset(screen, assetName);
+            if (location != null)
             {
-                using var screen = CaptureScreen();
-                if (FindAssetOnScreen(screen, "chrome.chrome_barra_endereco.png") != null) return true;
-
-                Thread.Sleep(1000);
-                attempts++;
+                _bot.Log($"Ação: {label}");
+                ClickAt(location.Value.X, location.Value.Y);
+                return true;
             }
             return false;
         }
@@ -188,7 +131,6 @@ namespace AutomacaoApp.Services
             var bounds = System.Windows.Forms.Screen.PrimaryScreen!.Bounds;
             double inputX = x * (65535.0 / bounds.Width);
             double inputY = y * (65535.0 / bounds.Height);
-
             _input.Mouse.MoveMouseTo(inputX, inputY);
             _input.Mouse.LeftButtonClick();
         }
