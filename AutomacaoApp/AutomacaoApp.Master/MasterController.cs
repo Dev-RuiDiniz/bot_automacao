@@ -1,64 +1,58 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using AutomacaoApp.Services;
+using AutomacaoApp.Models; // Usaremos apenas este para o objeto de dados
 
 namespace AutomacaoApp.Master
 {
     public class MasterController
     {
         private readonly MemucService _memuc = new MemucService();
-        private readonly int _maxConcurrent = 5; // Limite de bots rodando ao mesmo tempo
-        private readonly string _botExePath = "AutomacaoApp.exe"; // Caminho do Worker
+        private static readonly SemaphoreSlim _semaphore = new SemaphoreSlim(15, 15);
 
-        public void RunIndustrialScale()
+        public async Task RunIndustrialScaleAsync()
         {
-            Console.WriteLine("=== MASTER CONTROLLER: INICIANDO ESCALONAMENTO ===");
+            Console.WriteLine("=== MASTER ORCHESTRATOR: CORREÇÃO DE NAMESPACE ATIVA ===");
             
-            // 1. Mapeia todas as instâncias existentes
-            var totalInventory = _memuc.GetInventory();
-            Console.WriteLine($"Total de instâncias mapeadas: {totalInventory.Count}");
+            // Aqui garantimos que a lista retornada seja do tipo Services.EmulatorInstance
+            List<AutomacaoApp.Services.EmulatorInstance> inventory = _memuc.GetInventory();
+            var tasks = new List<Task>();
 
-            // 2. Filtra quem precisa rodar (Ex: Você pode filtrar por nome ou status no JSON)
-            var queue = new Queue<EmulatorInstance>(totalInventory);
-            var activeProcesses = new List<Process>();
-
-            while (queue.Count > 0 || activeProcesses.Count > 0)
+            foreach (var instance in inventory)
             {
-                // Limpa processos que já terminaram
-                activeProcesses.RemoveAll(p => p.HasExited);
-
-                // 3. Gerenciamento de Carga (Slot Management)
-                while (activeProcesses.Count < _maxConcurrent && queue.Count > 0)
-                {
-                    var nextInstance = queue.Dequeue();
-                    if (nextInstance == null) continue;
-                    
-                    Console.WriteLine($"[MASTER] Disparando Worker para ID {nextInstance.Index} ({nextInstance.Title})");
-
-                    // Dispara o Worker passando o Index como argumento
-                    var process = Process.Start(new ProcessStartInfo
-                    {
-                        FileName = _botExePath,
-                        Arguments = nextInstance.Index?.ToString(),
-                        UseShellExecute = true, // Abre em uma nova janela para monitoramento visual
-                        CreateNoWindow = false
-                    });
-
-                    if (process != null) activeProcesses.Add(process);
-                    
-                    // Delay de segurança para não sobrecarregar o barramento de disco no boot
-                    Thread.Sleep(5000); 
-                }
-
-                // Monitoramento no console
-                Console.Write($"\r[STATUS] Ativos: {activeProcesses.Count} | Restantes na fila: {queue.Count}      ");
-                Thread.Sleep(2000);
+                tasks.Add(ProcessInstanceAsync(instance));
             }
 
-            Console.WriteLine("\n=== TODAS AS INSTÂNCIAS FORAM PROCESSADAS ===");
+            await Task.WhenAll(tasks);
+        }
+
+        private async Task ProcessInstanceAsync(AutomacaoApp.Services.EmulatorInstance instance)
+        {
+            await _semaphore.WaitAsync();
+            try
+            {
+                ProcessStartInfo psi = new ProcessStartInfo
+                {
+                    FileName = "AutomacaoApp.exe",
+                    Arguments = instance.Index?.ToString(),
+                    CreateNoWindow = false,
+                    WindowStyle = ProcessWindowStyle.Normal
+                };
+
+                using var process = Process.Start(psi);
+                if (process != null)
+                {
+                    // WaitForExitAsync requer .NET 5+ ou superior
+                    await process.WaitForExitAsync();
+                }
+            }
+            finally
+            {
+                _semaphore.Release();
+            }
         }
     }
 }
