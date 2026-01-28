@@ -26,143 +26,114 @@ namespace AutomacaoApp.Services
             _input = new InputSimulator();
         }
 
-        /// <summary>
-        /// Valida se o Chrome (Android) está ativo. 
-        /// Agora inclui verificação preventiva de CAPTCHA antes de qualquer ação.
-        /// </summary>
         public void EnsureBrowserOpen()
         {
             _bot.Log("--- Validando Chrome no Emulador ---");
-            
-            // Prioridade Máxima: Verificar Captcha antes de começar
-            CheckForCaptcha();
+            CheckForCaptcha(); // Proteção inicial
 
             using var screen = CaptureScreen();
-            
             if (FindAsset(screen, "chrome.android_barra_endereco.png") == null)
             {
-                _bot.Log("Chrome oculto. Tentando abrir via ícone no MEmu...");
                 if (!DetectAndClick(screen, "chrome.android_icone.png", "Ícone Chrome"))
                 {
-                    throw new CriticalException("Falha ao localizar o Chrome. O emulador pode estar travado ou na tela errada.");
+                    throw new CriticalException("Chrome não encontrado no MEmu.");
                 }
-                Thread.Sleep(5000); // Aguarda renderização do app mobile
+                Thread.Sleep(5000);
             }
         }
 
-        /// <summary>
-        /// Navega para a URL. Limpa o campo e verifica Captcha pós-carregamento.
-        /// </summary>
         public void NavigateInAndroid(string url)
         {
             _bot.Log($"Navegando para: {url}");
+            CheckForCaptcha();
 
             using var screen = CaptureScreen();
             var bar = FindAsset(screen, "chrome.android_barra_endereco.png");
-
             if (bar != null)
             {
-                // 1. Foco na barra (Teclado Android sobe)
                 ClickAt(bar.Value.X, bar.Value.Y);
                 Thread.Sleep(1000);
-
-                // 2. Limpeza preventiva
                 _input.Keyboard.KeyPress(VirtualKeyCode.BACK);
-                Thread.Sleep(200);
-
-                // 3. Digitação e Execução
                 _input.Keyboard.TextEntry(url);
                 _input.Keyboard.KeyPress(VirtualKeyCode.RETURN);
-
-                _bot.Log("URL enviada. Aguardando carregamento e vigiando CAPTCHAs...");
-                
-                // 4. Aguarda e verifica se o site carregou um desafio de robô
                 Thread.Sleep(6000);
-                CheckForCaptcha(); 
+                CheckForCaptcha();
             }
         }
 
-        /// <summary>
-        /// MONITOR DE CAPTCHA (KILL SWITCH): 
-        /// Se detectado, encerra o emulador e interrompe o bot imediatamente.
-        /// </summary>
+        // SOLUÇÃO DO ERRO CS1061: Método de Login implementado aqui
+        public void FillLoginForm(string user, string pass)
+        {
+            _bot.Log("Preenchendo credenciais no site...");
+            CheckForCaptcha();
+
+            if (DetectAndClickInsideWeb("site.campo_usuario.png", "Campo Usuário"))
+            {
+                _input.Keyboard.TextEntry(user);
+                Thread.Sleep(600);
+            }
+
+            if (DetectAndClickInsideWeb("site.campo_senha.png", "Campo Senha"))
+            {
+                _input.Keyboard.TextEntry(pass);
+                Thread.Sleep(600);
+            }
+
+            DetectAndClickInsideWeb("site.botao_login.png", "Botão Login");
+        }
+
         public void CheckForCaptcha()
         {
             using var screen = CaptureScreen();
             if (FindAsset(screen, "chrome.captcha_detectado.png") != null)
             {
-                _bot.Log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-                _bot.Log("[CRÍTICO] CAPTCHA DETECTADO! ACIONANDO KILL SWITCH.");
-                _bot.Log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-
-                ForceKillEmulator(); // Fecha o MEmu instantaneamente
-                
-                throw new CriticalException("Segurança: Captcha detectado. Bot encerrado para evitar banimento.");
+                _bot.Log("[ALERTA] CAPTCHA DETECTADO! Encerrando MEmu...");
+                ForceKillEmulator();
+                throw new CriticalException("Captcha detectado. Operação interrompida.");
             }
         }
 
-        /// <summary>
-        /// Monitor de carregamento para a página de bônus.
-        /// </summary>
         public bool WaitForWebBonus()
         {
-            _bot.Log("Monitorando renderização do bônus...");
-            
             int attempts = 0;
-            const int MAX_WAIT = 15;
-            string assetName = "chrome.android_bonus_pronto.png";
-
-            while (attempts < MAX_WAIT)
+            while (attempts < 15)
             {
-                CheckForCaptcha(); // Verifica captcha em cada loop de carregamento
-
+                CheckForCaptcha();
                 using var screen = CaptureScreen();
-                if (FindAsset(screen, assetName) != null)
-                {
-                    _bot.Log("Bônus mobile carregado e pronto!");
-                    return true;
-                }
-
+                if (FindAsset(screen, "chrome.android_bonus_pronto.png") != null) return true;
                 Thread.Sleep(1500);
                 attempts++;
             }
             return false;
         }
 
-        // --- MOTOR DE INTERAÇÃO E SEGURANÇA ---
+        // MÉTODOS AUXILIARES
+        private bool DetectAndClickInsideWeb(string assetName, string label)
+        {
+            using var screen = CaptureScreen();
+            return DetectAndClick(screen, assetName, label);
+        }
 
         private void ForceKillEmulator()
         {
-            try
-            {
-                _bot.Log("Finalizando processos do MEmu...");
-                foreach (var process in Process.GetProcessesByName("MEmu"))
-                {
-                    process.Kill();
-                }
-            }
-            catch (Exception ex)
-            {
-                _bot.Log($"Erro ao forçar fechamento: {ex.Message}");
-            }
+            foreach (var process in Process.GetProcessesByName("MEmu")) process.Kill();
         }
 
         private Point? FindAsset(Bitmap screen, string assetName)
         {
             string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "assets", assetName);
             if (!File.Exists(path)) return null;
-
             using var template = new Bitmap(path);
             return _vision.FindElement(screen, template);
         }
 
         private bool DetectAndClick(Bitmap screen, string assetName, string label)
         {
-            var location = FindAsset(screen, assetName);
-            if (location != null)
+            var loc = FindAsset(screen, assetName);
+            if (loc != null)
             {
-                _bot.Log($"Ação: {label}");
-                ClickAt(location.Value.X, location.Value.Y);
+                _bot.Log($"Clicando em: {label}");
+                ClickAt(loc.Value.X, loc.Value.Y);
                 return true;
             }
             return false;
@@ -171,20 +142,15 @@ namespace AutomacaoApp.Services
         private void ClickAt(int x, int y)
         {
             var bounds = System.Windows.Forms.Screen.PrimaryScreen!.Bounds;
-            double inputX = x * (65535.0 / bounds.Width);
-            double inputY = y * (65535.0 / bounds.Height);
-            _input.Mouse.MoveMouseTo(inputX, inputY);
+            _input.Mouse.MoveMouseTo(x * (65535.0 / bounds.Width), y * (65535.0 / bounds.Height));
             _input.Mouse.LeftButtonClick();
         }
 
         private Bitmap CaptureScreen()
         {
-            var bounds = System.Windows.Forms.Screen.PrimaryScreen!.Bounds;
-            Bitmap bmp = new Bitmap(bounds.Width, bounds.Height);
-            using (Graphics g = Graphics.FromImage(bmp))
-            {
-                g.CopyFromScreen(Point.Empty, Point.Empty, bounds.Size);
-            }
+            var b = System.Windows.Forms.Screen.PrimaryScreen!.Bounds;
+            Bitmap bmp = new Bitmap(b.Width, b.Height);
+            using (Graphics g = Graphics.FromImage(bmp)) g.CopyFromScreen(Point.Empty, Point.Empty, b.Size);
             return bmp;
         }
     }
