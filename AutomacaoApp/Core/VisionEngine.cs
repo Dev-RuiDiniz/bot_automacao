@@ -13,9 +13,9 @@ namespace AutomacaoApp.Core
         /// </summary>
         /// <param name="screen">Captura atual da tela.</param>
         /// <param name="template">Imagem do asset a ser buscado.</param>
-        /// <param name="initialThreshold">Precisão inicial (Padrão: 0.9 ou 90%).</param>
+        /// <param name="initialThreshold">Precisão inicial (Padrão: 0.8 ou 80%).</param>
         /// <returns>Coordenadas do centro do elemento ou null.</returns>
-        public System.Drawing.Point? FindElement(Bitmap screen, Bitmap template, double initialThreshold = 0.9)
+        public System.Drawing.Point? FindElement(Bitmap screen, Bitmap template, double initialThreshold = 0.8)
         {
             // Converte Bitmaps para Mat (formato OpenCV)
             using var matScreen = BitmapConverter.ToMat(screen);
@@ -35,8 +35,8 @@ namespace AutomacaoApp.Core
                 return GetCenterPoint(maxLoc, template.Width, template.Height);
             }
 
-            // 2ª Tentativa (Dinâmica): Se falhou, tentamos com 0.75 (75% de confiança)
-            double fallbackThreshold = initialThreshold - 0.15;
+            // 2ª Tentativa (Dinâmica): Se falhou, tentamos com 0.60 (60% de confiança)
+            double fallbackThreshold = initialThreshold - 0.20;
             if (maxVal >= fallbackThreshold)
             {
                 // Log opcional via injeção de dependência se necessário: 
