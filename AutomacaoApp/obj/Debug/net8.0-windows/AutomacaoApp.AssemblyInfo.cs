@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("AutomacaoApp")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+9a19cc3444634ce7184f51ea251bbc8718ca4933")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+4bf8f777230872289cc41f1febb0e13efb1fe6f0")]
 [assembly: System.Reflection.AssemblyProductAttribute("AutomacaoApp")]
 [assembly: System.Reflection.AssemblyTitleAttribute("AutomacaoApp")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

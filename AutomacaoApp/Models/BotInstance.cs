@@ -8,12 +8,16 @@ namespace AutomacaoApp.Models
         // Propriedades da Instância
         public Guid Id { get; private set; }
         public string Name { get; set; }
+        
+        // SOLUÇÃO CS1061: Atalho para o Program.cs conseguir ler o nome
+        public string InstanceName => Name; 
+
         public BotState Status { get; set; }
         public DateTime LastUpdate { get; private set; }
 
         public BotInstance(string name)
         {
-            Id = Guid.NewGuid(); // Gera um identificador único universal
+            Id = Guid.NewGuid(); 
             Name = name;
             Status = BotState.Opening;
             LastUpdate = DateTime.Now;
@@ -32,13 +36,12 @@ namespace AutomacaoApp.Models
         }
 
         /// <summary>
-        /// Registra logs prefixados com o ID e Nome da instância para facilitar o debug.
+        /// Registra logs prefixados com o ID e Nome da instância.
         /// </summary>
         public void Log(string message)
         {
+            // Formatação do log para console/debug
             string logMessage = $"[{DateTime.Now:HH:mm:ss}] [ID: {Id.ToString().Substring(0, 8)}] [{Name}]: {message}";
-            
-            // Aqui você poderia salvar em um arquivo .txt usando Newtonsoft.Json ou File.AppendText
             Console.WriteLine(logMessage);
         }
     }
