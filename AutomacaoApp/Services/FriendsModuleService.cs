@@ -37,12 +37,12 @@ namespace AutomacaoApp.Services
 
             _bot.Log("Acesso à tela de amigos confirmado.");
 
-            // 2. Loop de Coleta Contínua
+            // 2. Loop de Coleta Contínua com Contador de Segurança
             ProcessFriendsList();
 
             _bot.Log("Módulo Amigos finalizado.");
             
-            // 3. Transição de Estado
+            // 3. Transição de Estado para o próximo módulo (Roleta)
             _bot.UpdateStatus(BotState.Roulette);
         }
 
@@ -72,37 +72,52 @@ namespace AutomacaoApp.Services
         public void ProcessFriendsList()
         {
             _bot.Log("Iniciando varredura de presentes...");
+            
             bool hasMoreActions = true;
-            int maxAttempts = 30; // Segurança contra loops infinitos
+            int maxAttempts = 30;       // Limite de scans de tela
+            int interactions = 0;      // Contador de cliques realizados
+            int maxInteractions = 25;  // SEGURANÇA: Limite de cliques por ciclo
 
             while (hasMoreActions && maxAttempts > 0)
             {
-                using var screen = CaptureScreen();
-
-                // 1. Condição de Parada: Lista Vazia
-                if (CheckIfListIsEmpty(screen))
+                if (interactions >= maxInteractions)
                 {
-                    _bot.Log("Sinal de 'Lista Vazia' detectado.");
+                    _bot.Log($"[AVISO] Limite de segurança atingido ({maxInteractions} cliques).");
                     break;
                 }
 
-                // 2. Tenta coletar e depois enviar (Prioridade para entrada de recursos)
-                bool collected = DetectAndClick(screen, "amigos.botao_recolher_presente.png", "Coletar");
-                bool sent = DetectAndClick(screen, "amigos.botao_enviar_presente.png", "Enviar");
+                using var screen = CaptureScreen();
 
-                // Se nada foi encontrado na tela atual
-                if (!collected && !sent)
+                if (CheckIfListIsEmpty(screen))
                 {
-                    _bot.Log("Nenhuma ação pendente na visão atual.");
-                    hasMoreActions = false; 
+                    _bot.Log("Sinal de 'Lista Vazia' detectado visualmente.");
+                    break;
+                }
+
+                // Tenta coletar primeiro (prioridade)
+                bool collected = DetectAndClick(screen, "amigos.botao_recolher_presente.png", "Coletar");
+                if (collected) interactions++;
+
+                if (!collected)
+                {
+                    // Tenta enviar se não houver nada para coletar
+                    bool sent = DetectAndClick(screen, "amigos.botao_enviar_presente.png", "Enviar");
+                    if (sent) interactions++;
+
+                    if (!sent)
+                    {
+                        _bot.Log("Nenhuma ação disponível na visão atual.");
+                        hasMoreActions = false; 
+                    }
                 }
 
                 maxAttempts--;
-                Thread.Sleep(800); // Delay para animação de UI
+                Thread.Sleep(800); 
             }
+
+            _bot.Log($"Processamento finalizado. Total de interações: {interactions}");
         }
 
-        // Método auxiliar para busca e clique
         private bool DetectAndClick(Bitmap screen, string assetName, string label)
         {
             string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "assets", assetName);
@@ -113,7 +128,7 @@ namespace AutomacaoApp.Services
 
             if (location != null)
             {
-                _bot.Log($"[Ação] {label} encontrado. Clicando...");
+                _bot.Log($"[Ação] {label} localizado. Clicando...");
                 ClickAt(location.Value.X, location.Value.Y);
                 return true;
             }
