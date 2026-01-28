@@ -2,96 +2,83 @@ using System;
 using System.Drawing;
 using System.IO;
 using System.Threading;
-using System.Runtime.Versioning;
-using WindowsInput;
+using System.Diagnostics;
 using AutomacaoApp.Core;
 using AutomacaoApp.Enums;
-using AutomacaoApp.Exceptions;
 using AutomacaoApp.Models;
 
 namespace AutomacaoApp.Services
 {
-    [SupportedOSPlatform("windows")]
     public class DailySpinService
     {
         private readonly VisionEngine _vision;
         private readonly BotInstance _bot;
-        private readonly IInputSimulator _input;
+        private readonly MemucService _memuc;
 
-        public DailySpinService(BotInstance bot, VisionEngine vision)
+        public DailySpinService(BotInstance bot, VisionEngine vision, MemucService memuc)
         {
             _bot = bot;
             _vision = vision;
-            _input = new InputSimulator();
+            _memuc = memuc;
         }
 
         public void Execute()
         {
-            _bot.Log("Iniciando Módulo: DailySpin");
+            _bot.Log($"[Módulo DailySpin] Iniciando na Instância {_bot.Index}");
 
-            using var screen = CaptureScreen();
+            // 1. Obtém o Handle da janela para captura isolada em background
+            IntPtr handle = Process.GetProcessById(_bot.PID).MainWindowHandle;
 
-            // 1. Verificar se o popup da roleta está disponível
-            if (DetectAndClick(screen, "popup_roleta_disponivel.png", "Aviso de Roleta"))
+            // 2. Loop de detecção e interação
+            using (var screen = _vision.CaptureProcessWindow(handle))
             {
-                Thread.Sleep(2000); // Aguarda transição de tela
-                
-                // 2. Tentar encontrar o botão de girar
-                using var secondScreen = CaptureScreen();
-                if (DetectAndClick(secondScreen, "btn_girar.png", "Botão Girar"))
+                if (DetectAndClick(screen, "popup_roleta_disponivel.png", "Aviso de Roleta"))
                 {
-                    _bot.Log("Giro iniciado! Aguardando 10s pela animação...");
-                    Thread.Sleep(10000); // Tempo da animação da roleta
+                    Thread.Sleep(3000); // Aguarda abertura da roleta
                     
-                    // 3. Coletar e fechar
-                    using var finalScreen = CaptureScreen();
-                    DetectAndClick(finalScreen, "btn_coletar_recompensa.png", "Coleta de Prêmio");
+                    using var secondScreen = _vision.CaptureProcessWindow(handle);
+                    if (DetectAndClick(secondScreen, "btn_girar.png", "Botão Girar"))
+                    {
+                        _bot.Log("Giro iniciado! Aguardando animação...");
+                        Thread.Sleep(10000); 
+
+                        using var finalScreen = _vision.CaptureProcessWindow(handle);
+                        DetectAndClick(finalScreen, "btn_coletar_recompensa.png", "Coleta de Prêmio");
+                    }
+                }
+                else
+                {
+                    _bot.Log("Roleta não disponível no momento.");
                 }
             }
-            else
-            {
-                _bot.Log("Roleta diária não detectada ou já realizada.");
-            }
 
-            _bot.UpdateStatus(BotState.FriendsModule); // Segue para o próximo estado
+            _bot.UpdateStatus(BotState.FriendsModule);
         }
 
+        /// <summary>
+        /// Detecta elemento na imagem e envia clique via ADB se encontrado.
+        /// </summary>
         private bool DetectAndClick(Bitmap screen, string templateName, string desc)
         {
-            string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "assets", templateName);
-            if (!File.Exists(path)) return false;
+            string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", templateName);
+            if (!File.Exists(path)) 
+            {
+                _bot.Log($"[ERRO] Asset não encontrado: {templateName}");
+                return false;
+            }
 
             using var template = new Bitmap(path);
             var point = _vision.FindElement(screen, template);
 
             if (point != null)
             {
-                _bot.Log($"[DailySpin] {desc} localizado. Clicando...");
-                PerformPhysicalClick(point.Value);
+                _bot.Log($"Elemento {desc} localizado em {point.Value.X},{point.Value.Y}.");
+                
+                // Envia o clique para o MEmu usando as coordenadas internas da janela
+                _memuc.SendClick(_bot.Index, point.Value.X, point.Value.Y);
                 return true;
             }
             return false;
-        }
-
-        private void PerformPhysicalClick(Point target)
-        {
-            var bounds = System.Windows.Forms.Screen.PrimaryScreen!.Bounds;
-            double x = target.X * (65535.0 / bounds.Width);
-            double y = target.Y * (65535.0 / bounds.Height);
-
-            _input.Mouse.MoveMouseTo(x, y);
-            _input.Mouse.LeftButtonClick();
-        }
-
-        private Bitmap CaptureScreen()
-        {
-            var bounds = System.Windows.Forms.Screen.PrimaryScreen!.Bounds;
-            Bitmap bmp = new Bitmap(bounds.Width, bounds.Height);
-            using (Graphics g = Graphics.FromImage(bmp))
-            {
-                g.CopyFromScreen(Point.Empty, Point.Empty, bounds.Size);
-            }
-            return bmp;
         }
     }
 }

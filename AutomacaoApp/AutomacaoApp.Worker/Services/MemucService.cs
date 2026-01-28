@@ -7,18 +7,15 @@ namespace AutomacaoApp.Services
 {
     public class MemucService
     {
-        // Certifique-se de que este caminho aponta para o seu diretório de instalação do MEmu
         private readonly string _exePath = @"C:\Program Files\Microvirt\MEmu\memuc.exe";
 
         /// <summary>
-        /// Mapeia o inventário completo de instâncias (até 1000+).
+        /// Obtém a lista de todas as instâncias com PID atualizado para o VisionEngine.
         /// </summary>
         public List<EmulatorInstance> GetInventory()
         {
             var instances = new List<EmulatorInstance>();
-            
-            var startInfo = new ProcessStartInfo
-            {
+            var startInfo = new ProcessStartInfo {
                 FileName = _exePath,
                 Arguments = "listv2",
                 RedirectStandardOutput = true,
@@ -26,14 +23,10 @@ namespace AutomacaoApp.Services
                 CreateNoWindow = true
             };
 
-            // Proteção contra falha ao iniciar o processo (Resolve CS8602)
             using var process = Process.Start(startInfo);
             if (process == null) return instances;
 
-            using var reader = process.StandardOutput;
-            string output = reader.ReadToEnd();
-
-            // O memuc listv2 entrega: index,title,handle,is_running,pid,process_id
+            string output = process.StandardOutput.ReadToEnd();
             var lines = output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
 
             foreach (var line in lines)
@@ -41,9 +34,7 @@ namespace AutomacaoApp.Services
                 var data = line.Split(',');
                 if (data.Length >= 5)
                 {
-                    // Parsing explícito: converte string do terminal para int do modelo
-                    instances.Add(new EmulatorInstance
-                    {
+                    instances.Add(new EmulatorInstance {
                         Index = data[0],
                         Title = data[1],
                         IsRunning = data[3] == "1",
@@ -54,23 +45,36 @@ namespace AutomacaoApp.Services
             return instances;
         }
 
+        /// <summary>
+        /// Envia um clique diretamente para o Android via ADB (Não usa o mouse do Windows).
+        /// </summary>
+        public void SendClick(string index, int x, int y)
+        {
+            ExecuteCommand($"adb -i {index} shell input tap {x} {y}");
+        }
+
+        /// <summary>
+        /// Envia uma tecla do sistema (Ex: 3 = HOME, 4 = BACK).
+        /// </summary>
+        public void SendKey(string index, int keyCode)
+        {
+            ExecuteCommand($"adb -i {index} shell input keyevent {keyCode}");
+        }
+
         public void StartInstance(int index) => ExecuteCommand($"start -i {index}");
         public void StopInstance(int index) => ExecuteCommand($"stop -i {index}");
 
         private void ExecuteCommand(string args)
         {
-            try 
-            {
+            try {
                 Process.Start(new ProcessStartInfo {
                     FileName = _exePath,
                     Arguments = args,
                     CreateNoWindow = true,
                     WindowStyle = ProcessWindowStyle.Hidden
-                });
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[ERRO CLI] Falha ao comandar memuc: {ex.Message}");
+                })?.WaitForExit();
+            } catch (Exception ex) {
+                Console.WriteLine($"[MEMUC ERROR] {ex.Message}");
             }
         }
     }

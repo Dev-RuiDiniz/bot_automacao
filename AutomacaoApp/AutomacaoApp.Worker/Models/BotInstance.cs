@@ -3,45 +3,54 @@ using AutomacaoApp.Enums;
 
 namespace AutomacaoApp.Models
 {
+    /// <summary>
+    /// Representa a sessão ativa de um Bot. 
+    /// Une a lógica de estado com as informações técnicas do emulador.
+    /// </summary>
     public class BotInstance
     {
-        // Propriedades da Instância
+        // --- Propriedades de Identificação ---
         public Guid Id { get; private set; }
         public string Name { get; set; }
         
-        public string InstanceName => Name; 
+        // --- Propriedades Técnicas (Vindas do EmulatorInstance) ---
+        public string Index { get; set; }  // O ID da instância no MEmu (ex: "0", "1")
+        public int PID { get; set; }      // O ID do processo no Windows (essencial para o VisionEngine)
 
+        // --- Gestão de Estado ---
         public BotState Status { get; set; }
         public DateTime LastUpdate { get; private set; }
 
-        public BotInstance(string name)
+        public BotInstance(string name, string index, int pid)
         {
-            Id = Guid.NewGuid(); 
+            Id = Guid.NewGuid();
             Name = name;
+            Index = index;
+            PID = pid;
             Status = BotState.Opening;
             LastUpdate = DateTime.Now;
             
-            Log("Instância inicializada com sucesso.");
+            Log($"Bot inicializado: MEmu Index {Index} | PID {PID}");
         }
 
         /// <summary>
-        /// Atualiza o estado do bot e registra a mudança no log.
+        /// Atualiza o estado da máquina de estados.
         /// </summary>
         public void UpdateStatus(BotState newState)
         {
-            Log($"Mudança de estado: {Status} -> {newState}");
+            Log($"Transição: {Status} -> {newState}");
             Status = newState;
             LastUpdate = DateTime.Now;
         }
 
         /// <summary>
-        /// Registra logs prefixados com o ID e Nome da instância.
+        /// Central de Logs da Instância.
         /// </summary>
         public void Log(string message)
         {
-            // Formatação do log para console/debug
-            string logMessage = $"[{DateTime.Now:HH:mm:ss}] [ID: {Id.ToString().Substring(0, 8)}] [{Name}]: {message}";
+            string logMessage = $"[{DateTime.Now:HH:mm:ss}] [Slot: {Index}] [{Name}]: {message}";
             Console.WriteLine(logMessage);
+            // Aqui pode-se adicionar o salvamento em ficheiro TXT no futuro
         }
     }
 }
