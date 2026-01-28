@@ -44,9 +44,9 @@
         "net8.0-windows7.0": {
           "targetAlias": "net8.0-windows",
           "dependencies": {
-            "InputSimulatorStandard": {
+            "InputSimulatorPlus": {
               "target": "Package",
-              "version": "[1.0.0, )"
+              "version": "[1.0.7, )"
             },
             "Newtonsoft.Json": {
               "target": "Package",

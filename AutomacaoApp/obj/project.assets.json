@@ -2,13 +2,17 @@
   "version": 3,
   "targets": {
     "net8.0-windows7.0": {
-      "InputSimulatorStandard/1.0.0": {
+      "InputSimulatorPlus/1.0.7": {
         "type": "package",
         "compile": {
-          "lib/netstandard2.0/InputSimulatorStandard.dll": {}
+          "lib/net20/WindowsInput.dll": {
+            "related": ".pdb;.xml"
+          }
         },
         "runtime": {
-          "lib/netstandard2.0/InputSimulatorStandard.dll": {}
+          "lib/net20/WindowsInput.dll": {
+            "related": ".pdb;.xml"
+          }
         }
       },
       "Microsoft.Win32.SystemEvents/8.0.0": {
@@ -151,16 +155,18 @@
     }
   },
   "libraries": {
-    "InputSimulatorStandard/1.0.0": {
-      "sha512": "qJ4MVLBPJ9iOIbieFaZ/62BDBZ8jvA3hjYr0XY69vU6qcjYJi+Cn+pSKYyUE/Nu9w+OBz34RfLraIcXigRyWbw==",
+    "InputSimulatorPlus/1.0.7": {
+      "sha512": "mOJt32qhvp3knYB8EEOh6/9cwZEwQV2BRD3DGZZ8guFg8vOt+xq6QGEt5eFjTkG+VWgVDMPVdCAIE4gnfab+3Q==",
       "type": "package",
-      "path": "inputsimulatorstandard/1.0.0",
+      "path": "inputsimulatorplus/1.0.7",
       "files": [
         ".nupkg.metadata",
         ".signature.p7s",
-        "inputsimulatorstandard.1.0.0.nupkg.sha512",
-        "inputsimulatorstandard.nuspec",
-        "lib/netstandard2.0/InputSimulatorStandard.dll"
+        "inputsimulatorplus.1.0.7.nupkg.sha512",
+        "inputsimulatorplus.nuspec",
+        "lib/net20/WindowsInput.dll",
+        "lib/net20/WindowsInput.pdb",
+        "lib/net20/WindowsInput.xml"
       ]
     },
     "Microsoft.Win32.SystemEvents/8.0.0": {
@@ -376,7 +382,7 @@
   },
   "projectFileDependencyGroups": {
     "net8.0-windows7.0": [
-      "InputSimulatorStandard >= 1.0.0",
+      "InputSimulatorPlus >= 1.0.7",
       "Newtonsoft.Json >= 13.0.3",
       "OpenCvSharp4 >= 4.10.0.*",
       "OpenCvSharp4.Extensions >= 4.10.0.*",
@@ -427,9 +433,9 @@
       "net8.0-windows7.0": {
         "targetAlias": "net8.0-windows",
         "dependencies": {
-          "InputSimulatorStandard": {
+          "InputSimulatorPlus": {
             "target": "Package",
-            "version": "[1.0.0, )"
+            "version": "[1.0.7, )"
           },
           "Newtonsoft.Json": {
             "target": "Package",
@@ -492,5 +498,17 @@
         "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.102/PortableRuntimeIdentifierGraph.json"
       }
     }
-  }
+  },
+  "logs": [
+    {
+      "code": "NU1701",
+      "level": "Warning",
+      "warningLevel": 1,
+      "message": "O pacote 'InputSimulatorPlus 1.0.7' foi restaurado usando '.NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramework,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1' em vez da estrutura de destino do projeto 'net8.0-windows7.0'. Esse pacote pode não ser totalmente compatível com o seu projeto.",
+      "libraryId": "InputSimulatorPlus",
+      "targetGraphs": [
+        "net8.0-windows7.0"
+      ]
+    }
+  ]
 }

@@ -10,7 +10,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="InputSimulatorStandard" Version="1.0.0" />
+    <PackageReference Include="InputSimulatorPlus" Version="1.0.7" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="OpenCvSharp4" Version="4.10.0.*" />
     <PackageReference Include="OpenCvSharp4.Extensions" Version="4.10.0.*" />
