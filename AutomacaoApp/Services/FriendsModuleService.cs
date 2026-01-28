@@ -17,6 +17,10 @@ namespace AutomacaoApp.Services
         private readonly VisionEngine _vision;
         private readonly BotInstance _bot;
         private readonly IInputSimulator _input;
+        
+        // Controle de Ciclos: Repete a entrada na tela de amigos X vezes
+        private int _cycleCount = 0;
+        private const int MAX_CYCLES = 3;
 
         public FriendsModuleService(BotInstance bot, VisionEngine vision)
         {
@@ -25,98 +29,115 @@ namespace AutomacaoApp.Services
             _input = new InputSimulator();
         }
 
+        /// <summary>
+        /// Ponto de entrada do módulo. Gerencia a navegação e a repetição de ciclos.
+        /// </summary>
         public void Execute()
         {
-            _bot.Log("Iniciando Módulo: Amigos");
+            _bot.Log($"--- Módulo Amigos: Ciclo {_cycleCount + 1}/{MAX_CYCLES} ---");
 
-            // 1. Navegação e Validação de Entrada
-            if (!NavigateToFriendsScreen())
+            // 1. Navegação: Tenta entrar na tela de amigos
+            if (NavigateToFriendsScreen())
             {
-                throw new LightException("Não foi possível acessar a tela de amigos. Tentando novamente no próximo ciclo.");
+                // 2. Processamento: Coleta e envia presentes na lista atual
+                ProcessFriendsList();
+
+                _cycleCount++;
+
+                // 3. Orquestração: Verifica se deve repetir ou seguir para o próximo módulo
+                if (_cycleCount < MAX_CYCLES)
+                {
+                    _bot.Log($"Ciclo {_cycleCount} finalizado. Reiniciando para garantir limpeza...");
+                    CloseFriendsScreen();
+                    
+                    // Mantém o estado atual para que o loop principal o execute novamente
+                    _bot.UpdateStatus(BotState.FriendsModule);
+                }
+                else
+                {
+                    _bot.Log("Todos os 3 ciclos de amigos concluídos.");
+                    _cycleCount = 0; // Reseta para a próxima execução global do bot
+                    _bot.UpdateStatus(BotState.Roulette);
+                }
             }
-
-            _bot.Log("Acesso à tela de amigos confirmado.");
-
-            // 2. Loop de Coleta Contínua com Contador de Segurança
-            ProcessFriendsList();
-
-            _bot.Log("Módulo Amigos finalizado.");
-            
-            // 3. Transição de Estado para o próximo módulo (Roleta)
-            _bot.UpdateStatus(BotState.Roulette);
+            else
+            {
+                _bot.Log("Não foi possível navegar para a tela de amigos. Abortando ciclo.");
+                _bot.UpdateStatus(BotState.Roulette); // Pula para evitar travamento
+            }
         }
 
-        private bool NavigateToFriendsScreen()
+        /// <summary>
+        /// Realiza o processamento contínuo da lista visível.
+        /// </summary>
+        private void ProcessFriendsList()
         {
-            using var screen = CaptureScreen();
-            string btnPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "assets", "amigos.botao_amigos.png");
-            string validationPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "assets", "amigos.tela_validacao.png");
-
-            if (!File.Exists(btnPath)) throw new CriticalException("Asset 'amigos.botao_amigos.png' faltando.");
-
-            using var templateBtn = new Bitmap(btnPath);
-            var btnLocation = _vision.FindElement(screen, templateBtn);
-
-            if (btnLocation != null)
-            {
-                _bot.Log("Clicando no botão de acesso...");
-                ClickAt(btnLocation.Value.X, btnLocation.Value.Y);
-                
-                Thread.Sleep(3000); // Aguarda carregamento da lista
-                return ValidateScreen(validationPath);
-            }
-
-            return false;
-        }
-
-        public void ProcessFriendsList()
-        {
-            _bot.Log("Iniciando varredura de presentes...");
-            
             bool hasMoreActions = true;
-            int maxAttempts = 30;       // Limite de scans de tela
-            int interactions = 0;      // Contador de cliques realizados
-            int maxInteractions = 25;  // SEGURANÇA: Limite de cliques por ciclo
+            int maxAttempts = 30;      // Limite de frames analisados
+            int interactions = 0;     // Contador de cliques reais
+            int maxInteractions = 25; // Circuit Breaker: evita cliques infinitos por erro visual
 
             while (hasMoreActions && maxAttempts > 0)
             {
                 if (interactions >= maxInteractions)
                 {
-                    _bot.Log($"[AVISO] Limite de segurança atingido ({maxInteractions} cliques).");
+                    _bot.Log("[Segurança] Limite de interações atingido. Possível falso positivo visual.");
                     break;
                 }
 
                 using var screen = CaptureScreen();
 
+                // Verifica se a lista está vazia através de um marcador visual
                 if (CheckIfListIsEmpty(screen))
                 {
-                    _bot.Log("Sinal de 'Lista Vazia' detectado visualmente.");
+                    _bot.Log("Lista de presentes vazia.");
                     break;
                 }
 
-                // Tenta coletar primeiro (prioridade)
+                // Prioridade 1: Recolher presente
                 bool collected = DetectAndClick(screen, "amigos.botao_recolher_presente.png", "Coletar");
                 if (collected) interactions++;
 
+                // Prioridade 2: Enviar presente (só tenta se não coletou para manter o foco da UI)
                 if (!collected)
                 {
-                    // Tenta enviar se não houver nada para coletar
                     bool sent = DetectAndClick(screen, "amigos.botao_enviar_presente.png", "Enviar");
                     if (sent) interactions++;
 
                     if (!sent)
                     {
-                        _bot.Log("Nenhuma ação disponível na visão atual.");
+                        _bot.Log("Nenhuma ação detectada na tela atual.");
                         hasMoreActions = false; 
                     }
                 }
 
                 maxAttempts--;
-                Thread.Sleep(800); 
+                Thread.Sleep(850); // Delay para a animação do botão sumindo
             }
-
-            _bot.Log($"Processamento finalizado. Total de interações: {interactions}");
         }
+
+        /// <summary>
+        /// Navega da Home para a Tela de Amigos e valida a transição.
+        /// </summary>
+        private bool NavigateToFriendsScreen()
+        {
+            using var screen = CaptureScreen();
+            if (DetectAndClick(screen, "amigos.botao_amigos.png", "Menu Amigos"))
+            {
+                Thread.Sleep(3000); // Tempo de carregamento da interface
+                return ValidateScreen("amigos.tela_validacao.png");
+            }
+            return false;
+        }
+
+        private void CloseFriendsScreen()
+        {
+            using var screen = CaptureScreen();
+            DetectAndClick(screen, "btn_fechar_generic.png", "Fechar Janela");
+            Thread.Sleep(1500);
+        }
+
+        // --- MÉTODOS AUXILIARES DE MOTOR ---
 
         private bool DetectAndClick(Bitmap screen, string assetName, string label)
         {
@@ -128,7 +149,7 @@ namespace AutomacaoApp.Services
 
             if (location != null)
             {
-                _bot.Log($"[Ação] {label} localizado. Clicando...");
+                _bot.Log($"Clicando em: {label}");
                 ClickAt(location.Value.X, location.Value.Y);
                 return true;
             }
@@ -144,18 +165,20 @@ namespace AutomacaoApp.Services
             return _vision.FindElement(screen, template) != null;
         }
 
-        private bool ValidateScreen(string assetPath)
+        private bool ValidateScreen(string assetName)
         {
-            if (!File.Exists(assetPath)) return true; 
+            string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "assets", assetName);
+            if (!File.Exists(path)) return true; // Se não houver asset, assume que entrou
 
-            using var validationScreen = CaptureScreen();
-            using var templateValidation = new Bitmap(assetPath);
-            return _vision.FindElement(validationScreen, templateValidation) != null;
+            using var screen = CaptureScreen();
+            using var template = new Bitmap(path);
+            return _vision.FindElement(screen, template) != null;
         }
 
         private void ClickAt(int x, int y)
         {
             var bounds = System.Windows.Forms.Screen.PrimaryScreen!.Bounds;
+            // Conversão para o sistema de coordenadas absoluto do Windows (0-65535)
             double inputX = x * (65535.0 / bounds.Width);
             double inputY = y * (65535.0 / bounds.Height);
 
