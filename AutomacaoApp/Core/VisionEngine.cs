@@ -1,10 +1,13 @@
 using System;
-using System.Drawing; // Para o Point e Bitmap do Windows
+using System.Drawing;
+using System.Runtime.Versioning; // Necessário para o atributo de plataforma
 using OpenCvSharp;
-using OpenCvSharp.Extensions; // Agora vai funcionar após o comando dotnet add
+using OpenCvSharp.Extensions;
 
 namespace AutomacaoApp.Core
 {
+    // Informamos ao compilador que esta classe foi feita especificamente para Windows
+    [SupportedOSPlatform("windows")]
     public class VisionEngine
     {
         private readonly double _threshold;
@@ -14,10 +17,9 @@ namespace AutomacaoApp.Core
             _threshold = threshold;
         }
 
-        // Especificamos System.Drawing.Point para evitar ambiguidade com OpenCvSharp.Point
         public System.Drawing.Point? FindElement(Bitmap screenSource, Bitmap template)
         {
-            // O ToMat() vive dentro de OpenCvSharp.Extensions
+            // Agora o aviso CA1416 desaparece pois o método está "protegido" pelo atributo da classe
             using var matSource = BitmapConverter.ToMat(screenSource);
             using var matTemplate = BitmapConverter.ToMat(template);
             using var result = new Mat();
@@ -27,7 +29,6 @@ namespace AutomacaoApp.Core
 
             if (maxVal >= _threshold)
             {
-                // Retorna o centro do objeto encontrado como um ponto do sistema
                 return new System.Drawing.Point(
                     maxLoc.X + (matTemplate.Cols / 2), 
                     maxLoc.Y + (matTemplate.Rows / 2)
