@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Threading;
@@ -26,28 +27,31 @@ namespace AutomacaoApp.Services
         }
 
         /// <summary>
-        /// Valida se o navegador Chrome (Android) está aberto dentro do MEmu.
+        /// Valida se o Chrome (Android) está ativo. 
+        /// Agora inclui verificação preventiva de CAPTCHA antes de qualquer ação.
         /// </summary>
         public void EnsureBrowserOpen()
         {
             _bot.Log("--- Validando Chrome no Emulador ---");
+            
+            // Prioridade Máxima: Verificar Captcha antes de começar
+            CheckForCaptcha();
 
             using var screen = CaptureScreen();
             
-            // Procura o asset da barra de endereços do Chrome Mobile
             if (FindAsset(screen, "chrome.android_barra_endereco.png") == null)
             {
-                _bot.Log("Chrome não detectado na frente. Tentando abrir via ícone...");
+                _bot.Log("Chrome oculto. Tentando abrir via ícone no MEmu...");
                 if (!DetectAndClick(screen, "chrome.android_icone.png", "Ícone Chrome"))
                 {
-                    throw new CriticalException("Não foi possível localizar o Chrome no menu do emulador.");
+                    throw new CriticalException("Falha ao localizar o Chrome. O emulador pode estar travado ou na tela errada.");
                 }
-                Thread.Sleep(4000); // Aguarda abertura do app
+                Thread.Sleep(5000); // Aguarda renderização do app mobile
             }
         }
 
         /// <summary>
-        /// Navega para a URL usando a interface do Chrome Mobile.
+        /// Navega para a URL. Limpa o campo e verifica Captcha pós-carregamento.
         /// </summary>
         public void NavigateInAndroid(string url)
         {
@@ -58,42 +62,64 @@ namespace AutomacaoApp.Services
 
             if (bar != null)
             {
-                // 1. Clica na barra para abrir o teclado do Android
+                // 1. Foco na barra (Teclado Android sobe)
                 ClickAt(bar.Value.X, bar.Value.Y);
-                Thread.Sleep(800);
+                Thread.Sleep(1000);
 
-                // 2. No Android, clicar na barra geralmente já seleciona tudo. 
-                // Usamos BACKSPACE por segurança para limpar.
+                // 2. Limpeza preventiva
                 _input.Keyboard.KeyPress(VirtualKeyCode.BACK);
                 Thread.Sleep(200);
 
-                // 3. Digita a URL e pressiona ENTER
+                // 3. Digitação e Execução
                 _input.Keyboard.TextEntry(url);
                 _input.Keyboard.KeyPress(VirtualKeyCode.RETURN);
 
-                _bot.Log("Aguardando carregamento da página mobile...");
+                _bot.Log("URL enviada. Aguardando carregamento e vigiando CAPTCHAs...");
+                
+                // 4. Aguarda e verifica se o site carregou um desafio de robô
                 Thread.Sleep(6000);
+                CheckForCaptcha(); 
             }
         }
 
         /// <summary>
-        /// Monitor de carregamento para a página de bônus dentro do navegador mobile.
+        /// MONITOR DE CAPTCHA (KILL SWITCH): 
+        /// Se detectado, encerra o emulador e interrompe o bot imediatamente.
+        /// </summary>
+        public void CheckForCaptcha()
+        {
+            using var screen = CaptureScreen();
+            if (FindAsset(screen, "chrome.captcha_detectado.png") != null)
+            {
+                _bot.Log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                _bot.Log("[CRÍTICO] CAPTCHA DETECTADO! ACIONANDO KILL SWITCH.");
+                _bot.Log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+
+                ForceKillEmulator(); // Fecha o MEmu instantaneamente
+                
+                throw new CriticalException("Segurança: Captcha detectado. Bot encerrado para evitar banimento.");
+            }
+        }
+
+        /// <summary>
+        /// Monitor de carregamento para a página de bônus.
         /// </summary>
         public bool WaitForWebBonus()
         {
-            _bot.Log("Monitorando renderização da página de bônus...");
+            _bot.Log("Monitorando renderização do bônus...");
             
             int attempts = 0;
             const int MAX_WAIT = 15;
-            // Asset de um elemento único da página web (ex: botão de claim ou logo do site)
             string assetName = "chrome.android_bonus_pronto.png";
 
             while (attempts < MAX_WAIT)
             {
+                CheckForCaptcha(); // Verifica captcha em cada loop de carregamento
+
                 using var screen = CaptureScreen();
                 if (FindAsset(screen, assetName) != null)
                 {
-                    _bot.Log("Página de bônus mobile carregada!");
+                    _bot.Log("Bônus mobile carregado e pronto!");
                     return true;
                 }
 
@@ -103,7 +129,23 @@ namespace AutomacaoApp.Services
             return false;
         }
 
-        // --- MOTOR DE INTERAÇÃO (OTIMIZADO PARA EMULADOR) ---
+        // --- MOTOR DE INTERAÇÃO E SEGURANÇA ---
+
+        private void ForceKillEmulator()
+        {
+            try
+            {
+                _bot.Log("Finalizando processos do MEmu...");
+                foreach (var process in Process.GetProcessesByName("MEmu"))
+                {
+                    process.Kill();
+                }
+            }
+            catch (Exception ex)
+            {
+                _bot.Log($"Erro ao forçar fechamento: {ex.Message}");
+            }
+        }
 
         private Point? FindAsset(Bitmap screen, string assetName)
         {
