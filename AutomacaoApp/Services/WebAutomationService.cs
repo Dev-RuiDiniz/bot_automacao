@@ -5,7 +5,7 @@ using System.IO;
 using System.Threading;
 using System.Runtime.Versioning;
 using WindowsInput;
-using WindowsInput.Native; // Necessário para VirtualKeyCode
+using WindowsInput.Native;
 using AutomacaoApp.Core;
 using AutomacaoApp.Exceptions;
 using AutomacaoApp.Models;
@@ -27,7 +27,7 @@ namespace AutomacaoApp.Services
         }
 
         /// <summary>
-        /// Inicia o Chrome, maximiza e valida a interface.
+        /// Inicia o Chrome, maximiza e valida a interface gráfica inicial.
         /// </summary>
         public void OpenBrowser(string url = "about:blank")
         {
@@ -35,22 +35,20 @@ namespace AutomacaoApp.Services
 
             try
             {
-                // Inicia o processo do Chrome com flags para facilitar a automação
                 Process.Start(new ProcessStartInfo
                 {
                     FileName = "chrome.exe",
-                    Arguments = url + " --start-maximized --disable-notifications",
+                    Arguments = $"{url} --start-maximized --disable-notifications",
                     UseShellExecute = true
                 });
 
-                // Validação visual de carregamento da GUI
                 if (WaitForBrowserReady())
                 {
                     _bot.Log("Chrome carregado e barra de endereço validada.");
                 }
                 else
                 {
-                    throw new LightException("O Chrome abriu, mas a barra de endereço não foi localizada visualmente.");
+                    throw new LightException("O Chrome abriu, mas a interface (barra de endereço) não foi localizada.");
                 }
             }
             catch (Exception ex)
@@ -61,38 +59,31 @@ namespace AutomacaoApp.Services
         }
 
         /// <summary>
-        /// Navega para uma URL clicando na barra de endereços detectada.
+        /// Navega para uma URL específica limpando a barra de endereços detectada.
         /// </summary>
         public void NavigateToUrl(string url)
         {
             _bot.Log($"Navegando para: {url}");
 
-            string assetPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "assets", "chrome.chrome_barra_endereco.png");
-            
             using var screen = CaptureScreen();
-            using var template = new Bitmap(assetPath);
-
-            // 1. Localiza a barra de endereços como âncora de clique
-            var location = _vision.FindElement(screen, template);
+            var location = FindAssetOnScreen(screen, "chrome.chrome_barra_endereco.png");
 
             if (location != null)
             {
-                // 2. Foco e Sanitização: Clica, limpa o campo (Ctrl+A -> Backspace)
+                // Foco e Sanitização
                 ClickAt(location.Value.X, location.Value.Y);
                 Thread.Sleep(500);
                 
-                _bot.Log("Limpando barra de endereços...");
                 _input.Keyboard.ModifiedKeyStroke(VirtualKeyCode.CONTROL, VirtualKeyCode.VK_A);
                 Thread.Sleep(200);
                 _input.Keyboard.KeyPress(VirtualKeyCode.BACK);
                 
-                // 3. Entrada da URL e Execução (Enter)
-                _bot.Log("Digitando URL...");
+                // Entrada da URL
                 _input.Keyboard.TextEntry(url);
                 _input.Keyboard.KeyPress(VirtualKeyCode.RETURN);
 
-                // Aguarda tempo de resposta do servidor
-                Thread.Sleep(5000); 
+                _bot.Log("URL enviada. Aguardando processamento...");
+                Thread.Sleep(5000); // Tempo para o servidor começar a responder
             }
             else
             {
@@ -101,27 +92,24 @@ namespace AutomacaoApp.Services
         }
 
         /// <summary>
-        /// Verifica periodicamente se a barra de endereços apareceu na tela.
+        /// Valida se o site carregou corretamente buscando um elemento visual único (Ex: Logo).
         /// </summary>
-        private bool WaitForBrowserReady()
+        public bool ValidateSite(string assetName)
         {
+            _bot.Log($"Validando site via: {assetName}");
+            
             int attempts = 0;
-            const int MAX_WAIT_SECONDS = 12;
-            string assetPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "assets", "chrome.chrome_barra_endereco.png");
+            const int MAX_LOAD_WAIT = 15;
 
-            if (!File.Exists(assetPath)) 
-                throw new CriticalException("Asset 'chrome.chrome_barra_endereco.png' não encontrado.");
-
-            using var template = new Bitmap(assetPath);
-
-            while (attempts < MAX_WAIT_SECONDS)
+            while (attempts < MAX_LOAD_WAIT)
             {
                 using var screen = CaptureScreen();
-                var location = _vision.FindElement(screen, template);
+                if (FindAssetOnScreen(screen, assetName) != null)
+                {
+                    _bot.Log("Site validado com sucesso.");
+                    return true;
+                }
 
-                if (location != null) return true;
-
-                _bot.Log($"Aguardando Chrome ({attempts + 1}s)...");
                 Thread.Sleep(1000);
                 attempts++;
             }
@@ -129,13 +117,75 @@ namespace AutomacaoApp.Services
             return false;
         }
 
+        /// <summary>
+        /// Realiza o preenchimento de credenciais em campos detectados visualmente.
+        /// </summary>
+        public void FillLoginForm(string user, string pass)
+        {
+            _bot.Log("Preenchendo formulário de login...");
+
+            // Preencher Usuário
+            if (DetectAndClickInsideWeb("site.campo_usuario.png", "Campo Usuário"))
+            {
+                _input.Keyboard.TextEntry(user);
+                Thread.Sleep(600);
+            }
+
+            // Preencher Senha
+            if (DetectAndClickInsideWeb("site.campo_senha.png", "Campo Senha"))
+            {
+                _input.Keyboard.TextEntry(pass);
+                Thread.Sleep(600);
+            }
+
+            // Clique no botão de confirmação
+            DetectAndClickInsideWeb("site.botao_login.png", "Botão Login");
+        }
+
         // --- MÉTODOS AUXILIARES DE MOTOR ---
+
+        private bool DetectAndClickInsideWeb(string assetName, string label)
+        {
+            using var screen = CaptureScreen();
+            var location = FindAssetOnScreen(screen, assetName);
+
+            if (location != null)
+            {
+                _bot.Log($"Elemento encontrado: {label}");
+                ClickAt(location.Value.X, location.Value.Y);
+                Thread.Sleep(400); // Aguarda o campo ganhar foco
+                return true;
+            }
+            _bot.Log($"[AVISO] Elemento não encontrado: {label}");
+            return false;
+        }
+
+        private Point? FindAssetOnScreen(Bitmap screen, string assetName)
+        {
+            string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "assets", assetName);
+            if (!File.Exists(path)) return null;
+
+            using var template = new Bitmap(path);
+            return _vision.FindElement(screen, template);
+        }
+
+        private bool WaitForBrowserReady()
+        {
+            int attempts = 0;
+            while (attempts < 12)
+            {
+                using var screen = CaptureScreen();
+                if (FindAssetOnScreen(screen, "chrome.chrome_barra_endereco.png") != null) return true;
+
+                Thread.Sleep(1000);
+                attempts++;
+            }
+            return false;
+        }
 
         private void ClickAt(int x, int y)
         {
             var bounds = System.Windows.Forms.Screen.PrimaryScreen!.Bounds;
-            
-            // Conversão para coordenadas absolutas do Windows Input (0-65535)
             double inputX = x * (65535.0 / bounds.Width);
             double inputY = y * (65535.0 / bounds.Height);
 
