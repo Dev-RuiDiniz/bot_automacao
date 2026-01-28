@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using AutomacaoApp.Services;
-using AutomacaoApp.Models;
 
 namespace AutomacaoApp.Master
 {
@@ -35,13 +34,15 @@ namespace AutomacaoApp.Master
                 while (activeProcesses.Count < _maxConcurrent && queue.Count > 0)
                 {
                     var nextInstance = queue.Dequeue();
+                    if (nextInstance == null) continue;
+                    
                     Console.WriteLine($"[MASTER] Disparando Worker para ID {nextInstance.Index} ({nextInstance.Title})");
 
                     // Dispara o Worker passando o Index como argumento
                     var process = Process.Start(new ProcessStartInfo
                     {
                         FileName = _botExePath,
-                        Arguments = nextInstance.Index.ToString(),
+                        Arguments = nextInstance.Index?.ToString(),
                         UseShellExecute = true, // Abre em uma nova janela para monitoramento visual
                         CreateNoWindow = false
                     });
