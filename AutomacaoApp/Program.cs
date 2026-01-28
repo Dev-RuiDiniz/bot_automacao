@@ -9,17 +9,17 @@ namespace AutomacaoApp
 {
     /// <summary>
     /// Orquestrador Principal do Bot Híbrido (MEmu).
-    /// Gerencia o ciclo de vida, troca de contexto entre apps e monitoramento de métricas.
+    /// Centraliza a lógica de decisão, tratamento de erros e métricas.
     /// </summary>
     class Program
     {
-        // Instanciação dos motores base com identificador único da instância
+        // Instanciação dos motores base (Core)
         private static readonly BotInstance _bot = new BotInstance("MEmu_Automator_V1");
         private static readonly VisionEngine _vision = new VisionEngine();
 
         static void Main(string[] args)
         {
-            // Configuração visual do console
+            // Configuração de Título com a propriedade InstanceName do BotInstance
             Console.Title = $"Iniciado: {_bot.InstanceName} | Bot Híbrido Ativo";
             _bot.Log("=== Sistema Orquestrador Iniciado ===");
 
@@ -29,7 +29,7 @@ namespace AutomacaoApp
             var bridge = new AppBridgeService(_bot, _vision);
             var gameBonus = new InGameBonusService(_bot, _vision);
             var shutdown = new ShutdownService(_bot, _vision);
-            var metrics = new MetricsService(_bot); // Novo: Dash de Monitoramento JSON
+            var metrics = new MetricsService(_bot); 
 
             // Loop Infinito de Operação
             while (true)
@@ -39,80 +39,83 @@ namespace AutomacaoApp
                     _bot.Log(">>> Iniciando novo ciclo de trabalho...");
 
                     // 1. CAMADA DE SEGURANÇA (VPN)
-                    // Verifica se o túnel está ativo antes de qualquer exposição de tráfego
+                    // Garante que o IP está protegido antes de abrir o browser ou jogo
                     vpnService.EnsureConnected();
+
+                    // 2. CAMADA DE SAÚDE (Crash Check)
+                    // Verifica se o jogo crashou ou está em tela preta antes de começar
+                    bridge.HandlePotentialCrash();
                     
-                    // 2. CAMADA WEB (Chrome Android)
-                    // Acessa bônus externos e valida presença de CAPTCHA
+                    // 3. CAMADA WEB (Chrome Android)
+                    // Realiza a coleta do bônus diário externo
                     webService.EnsureBrowserOpen();
                     webService.NavigateInAndroid("https://site-recompensa.com/bonus");
                     
                     bool bonusWebColetado = false;
                     if (webService.WaitForWebBonus())
                     {
-                        webService.FillLoginForm("usuario_exemplo", "senha_segura");
+                        webService.FillLoginForm("usuario_bot", "senha_segura");
                         bonusWebColetado = true;
                     }
 
-                    // 3. CAMADA DE TRANSIÇÃO (Bridge)
-                    // Alterna o foco do Chrome para o APK do Jogo via 'Apps Recentes'
+                    // 4. CAMADA DE TRANSIÇÃO (Bridge)
+                    // Alterna o foco do navegador para o aplicativo do jogo
                     bridge.ReturnToGame();
 
-                    // 4. CAMADA IN-GAME (Tarefa Nativa)
-                    // Executa a coleta interna e validações visuais de sucesso
+                    // 5. CAMADA IN-GAME (Tarefa Nativa)
+                    // Coleta recompensas internas e valida bônus coletado
                     gameBonus.ProcessDailyBonus();
                     
-                    // 5. FINALIZAÇÃO E LIMPEZA
-                    // Fecha apps para liberar RAM e volta para a tela home do MEmu
+                    // 6. FINALIZAÇÃO E LIMPEZA
+                    // Encerra processos para evitar lentidão no MEmu e volta à Home
                     shutdown.CleanCleanup();
 
-                    // Atualiza métricas no dashboard JSON
+                    // 7. DASHBOARD (Persistência JSON)
+                    // Registra o sucesso e atualiza o monitoramento.json
                     metrics.RegistrarSucesso(foiBonus: bonusWebColetado);
 
-                    _bot.Log(">>> Ciclo concluído com sucesso. Entrando em repouso.");
+                    _bot.Log(">>> Ciclo concluído com sucesso. Entrando em modo repouso.");
                     AguardarProximoCiclo();
                 }
                 catch (CriticalException ex)
                 {
-                    // Erros que representam risco à conta (Captcha, VPN Down)
+                    // Falhas de segurança (Captcha/VPN offline) -> Para o Bot imediatamente
                     _bot.Log($"[FATAL] {ex.Message}");
                     metrics.RegistrarFalhaCritica();
-                    _bot.Log("Execução interrompida por segurança. Verifique o emulador.");
-                    break; // Sai do loop infinito
+                    _bot.Log("Encerrando por segurança. Resolva o problema manualmente no emulador.");
+                    break; 
                 }
                 catch (LightException ex)
                 {
-                    // Erros de interface (Lag, Asset não encontrado)
-                    _bot.Log($"[RECUPERAÇÃO] {ex.Message}. Reiniciando fluxo em 10s...");
+                    // Falhas de interface (Lag/Asset não encontrado) -> Tenta recuperar no próximo ciclo
+                    _bot.Log($"[RECUPERAÇÃO] {ex.Message}. Tentando reinicializar em 10s...");
                     Thread.Sleep(10000);
-                    // O loop continuará, tentando novamente do zero
                 }
                 catch (Exception ex)
                 {
-                    // Erros imprevistos de sistema
-                    _bot.Log($"[SISTEMA] Erro não tratado: {ex.Message}");
+                    // Erros imprevistos de código ou sistema operacional
+                    _bot.Log($"[SISTEMA] Erro crítico não tratado: {ex.Message}");
                     Thread.Sleep(5000);
                 }
             }
         }
 
         /// <summary>
-        /// Implementa o tempo de espera "humano" com variação aleatória.
-        /// Evita padrões de tempo fixo que facilitam a detecção por servidores.
+        /// Gera uma pausa aleatória entre ciclos para mimetizar comportamento humano.
         /// </summary>
         private static void AguardarProximoCiclo()
         {
             Random rnd = new Random();
-            int minutos = rnd.Next(15, 22); // Entre 15 e 21 minutos
+            int minutos = rnd.Next(15, 23); // Varia entre 15 e 22 minutos
             
-            _bot.Log($"Standby ativo: Próxima execução em aproximadamente {minutos} minutos.");
+            _bot.Log($"Standby: Próxima verificação em {minutos} minutos.");
 
             for (int i = minutos; i > 0; i--)
             {
-                Console.Write($"\rTempo restante: {i:D2} min | Status: Aguardando...   ");
-                Thread.Sleep(60000); // Espera 1 minuto
+                Console.Write($"\r[COUNTDOWN] Retomando em: {i:D2} min | Status: Idle...   ");
+                Thread.Sleep(60000); // 1 minuto
             }
-            Console.WriteLine("\nTempo de espera concluído!");
+            Console.WriteLine("\n[AVISO] Reiniciando ciclo operacional...");
         }
     }
 }

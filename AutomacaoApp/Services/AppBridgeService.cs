@@ -31,15 +31,17 @@ namespace AutomacaoApp.Services
         {
             _bot.Log("--- Bridge: Retornando ao Jogo Principal ---");
 
-            // 1. Abre a lista de Apps Recentes do Android (Botão quadrado do MEmu)
-            // Geralmente mapeado para uma coordenada fixa na barra lateral ou atalho
+            // 1. Verifica se o app crashou ANTES de tentar alternar
+            HandlePotentialCrash();
+
+            // 2. Abre a lista de Apps Recentes do Android
             _bot.Log("Acessando alternador de aplicativos...");
-            _input.Keyboard.ModifiedKeyStroke(VirtualKeyCode.MENU, VirtualKeyCode.TAB); // Atalho comum para 'Recentes'
+            _input.Keyboard.ModifiedKeyStroke(VirtualKeyCode.MENU, VirtualKeyCode.TAB); 
             Thread.Sleep(1500);
 
             using var screen = CaptureScreen();
 
-            // 2. Busca a miniatura do Jogo para retomar o foco
+            // 3. Busca a miniatura do Jogo para retomar o foco
             var gameThumb = FindAsset(screen, "bridge.miniatura_jogo.png");
             if (gameThumb != null)
             {
@@ -48,17 +50,67 @@ namespace AutomacaoApp.Services
             }
             else
             {
-                // Fallback: Se não achar nos recentes, volta para a Home e clica no ícone principal
                 _bot.Log("Miniatura não encontrada. Forçando retorno via Home Screen...");
-                _input.Keyboard.KeyPress(VirtualKeyCode.ESCAPE); // Simula botão 'Home' ou 'Back'
-                Thread.Sleep(1000);
-                
-                using var homeScreen = CaptureScreen();
-                DetectAndClick(homeScreen, "game.icone_principal.png", "Ícone do Jogo");
+                ReturnToHomeAndOpen();
             }
 
-            // 3. Validação de Retorno
+            // 4. Validação de Retorno
             ValidateGameActive();
+        }
+
+        /// <summary>
+        /// Detecta se o jogo parou de funcionar e realiza a reinicialização completa (Cold Boot).
+        /// </summary>
+        public void HandlePotentialCrash()
+        {
+            using var screen = CaptureScreen();
+            
+            // Verifica assets de erro: popup do Android ("App parou") ou tela totalmente preta
+            bool isCrashed = FindAsset(screen, "erros.app_crash.png") != null;
+            bool isBlackScreen = CheckForBlackScreen(screen);
+
+            if (isCrashed || isBlackScreen)
+            {
+                _bot.Log("[CRÍTICO] Falha no APK detectada (Crash ou Tela Preta).");
+                
+                // Procedimento de limpeza: Fecha o app nos recentes
+                ForceCloseCurrentApp();
+                
+                // Reinicia do zero
+                ReturnToHomeAndOpen();
+            }
+        }
+
+        private void ReturnToHomeAndOpen()
+        {
+            _bot.Log("Executando Cold Boot: Voltando à Home...");
+            _input.Keyboard.KeyPress(VirtualKeyCode.ESCAPE); 
+            Thread.Sleep(2000);
+            
+            using var homeScreen = CaptureScreen();
+            if (DetectAndClick(homeScreen, "game.icone_principal.png", "Ícone do Jogo"))
+            {
+                _bot.Log("Jogo reaberto. Aguardando carregamento inicial (Splash Screen)...");
+                Thread.Sleep(15000); // Tempo de espera estendido para o boot frio
+            }
+        }
+
+        private void ForceCloseCurrentApp()
+        {
+            _input.Keyboard.ModifiedKeyStroke(VirtualKeyCode.MENU, VirtualKeyCode.TAB);
+            Thread.Sleep(1000);
+            
+            using var screen = CaptureScreen();
+            // Tenta clicar no 'X' da miniatura do jogo se ele estiver visível
+            DetectAndClick(screen, "bridge.btn_fechar_miniatura.png", "Encerrando processo travado");
+            Thread.Sleep(1000);
+        }
+
+        private bool CheckForBlackScreen(Bitmap screen)
+        {
+            // Lógica simples de amostragem: verifica se o centro da tela é totalmente preto
+            Color centerPixel = screen.GetPixel(screen.Width / 2, screen.Height / 2);
+            return centerPixel.R == 0 && centerPixel.G == 0 && centerPixel.B == 0;
         }
 
         private void ValidateGameActive()
@@ -69,16 +121,16 @@ namespace AutomacaoApp.Services
                 using var screen = CaptureScreen();
                 if (FindAsset(screen, "game.hud_principal.png") != null)
                 {
-                    _bot.Log("Foco do Jogo reestabelecido com sucesso.");
+                    _bot.Log("Foco do Jogo reestabelecido e HUD validada.");
                     return;
                 }
-                Thread.Sleep(2000);
+                Thread.Sleep(2500);
                 attempts++;
             }
-            _bot.Log("[AVISO] Interface do jogo não detectada após transição.");
+            _bot.Log("[AVISO] HUD do jogo não detectada. O app pode estar em tela de loading.");
         }
 
-        // --- MÉTODOS DE APOIO ---
+        // --- MÉTODOS DE APOIO TÉCNICO ---
 
         private Point? FindAsset(Bitmap screen, string assetName)
         {
@@ -93,6 +145,7 @@ namespace AutomacaoApp.Services
             var loc = FindAsset(screen, assetName);
             if (loc != null)
             {
+                _bot.Log($"Ação: {label}");
                 ClickAt(loc.Value.X, loc.Value.Y);
                 return true;
             }
@@ -110,7 +163,8 @@ namespace AutomacaoApp.Services
         {
             var bounds = System.Windows.Forms.Screen.PrimaryScreen!.Bounds;
             Bitmap bmp = new Bitmap(bounds.Width, bounds.Height);
-            using (Graphics g = Graphics.FromImage(bmp)) g.CopyFromScreen(Point.Empty, Point.Empty, bounds.Size);
+            using (Graphics g = Graphics.FromImage(bmp)) 
+                g.CopyFromScreen(Point.Empty, Point.Empty, bounds.Size);
             return bmp;
         }
     }
