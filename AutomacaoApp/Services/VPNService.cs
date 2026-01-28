@@ -6,6 +6,7 @@ using System.Runtime.Versioning;
 using WindowsInput;
 using AutomacaoApp.Core;
 using AutomacaoApp.Enums;
+using AutomacaoApp.Exceptions;
 using AutomacaoApp.Models;
 
 namespace AutomacaoApp.Services
@@ -17,6 +18,10 @@ namespace AutomacaoApp.Services
         private readonly BotInstance _bot;
         private readonly IInputSimulator _input;
 
+        // Configurações de Resiliência
+        private const int MAX_CONNECTION_ATTEMPTS = 3;
+        private const int HANDSHAKE_TIMEOUT_MS = 8000;
+
         public VPNService(BotInstance bot, VisionEngine vision)
         {
             _bot = bot;
@@ -24,52 +29,90 @@ namespace AutomacaoApp.Services
             _input = new InputSimulator();
         }
 
+        /// <summary>
+        /// Garante que a VPN NekoBox esteja conectada. 
+        /// Lança CriticalException se houver falha fatal ou timeout.
+        /// </summary>
         public void EnsureConnected()
         {
-            _bot.Log("--- Verificando Status VPN (NekoBox) ---");
+            _bot.Log("--- [SEGURANÇA] Validando Conexão VPN NekoBox ---");
 
-            using var screen = CaptureScreen();
+            int attempts = 0;
+            bool secure = false;
 
-            // 1. Verifica se já está conectado (procurando um asset de "status_conectado")
-            if (IsConnected(screen))
+            while (attempts < MAX_CONNECTION_ATTEMPTS)
             {
-                _bot.Log("VPN NekoBox já está ativa. Prosseguindo...");
-                return;
-            }
+                using var screen = CaptureScreen();
 
-            // 2. Se não estiver conectado, tenta clicar no botão de conexão
-            _bot.Log("VPN desconectada. Tentando ativar...");
-            if (DetectAndClick(screen, "nekobox.btn_conectar.png", "Botão Conectar VPN"))
-            {
-                // Aguarda o túnel ser estabelecido
-                Thread.Sleep(5000);
-                
-                using var checkScreen = CaptureScreen();
-                if (IsConnected(checkScreen))
+                // 1. Verificação de Erro Fatal (Kill Switch Visual)
+                // Se o APK do NekoBox mostrar um erro de sistema, paramos tudo.
+                if (DetectElement(screen, "vpn.erro_vpn.png"))
                 {
-                    _bot.Log("VPN conectada com sucesso!");
+                    _bot.Log("[CRÍTICO] Erro fatal detectado na interface do NekoBox.");
+                    throw new CriticalException("VPN NekoBox reportou erro de driver ou sistema.");
+                }
+
+                // 2. Verifica se o status já é "Conectado"
+                if (IsConnected(screen))
+                {
+                    _bot.Log("Conexão VPN confirmada e segura.");
+                    secure = true;
+                    break;
+                }
+
+                // 3. Tentativa de acionamento
+                _bot.Log($"VPN desconectada. Tentativa de ativação {attempts + 1}/{MAX_CONNECTION_ATTEMPTS}...");
+                
+                if (DetectAndClick(screen, "nekobox.btn_conectar.png", "Botão Conectar"))
+                {
+                    // Aguarda o handshake do servidor VPN
+                    Thread.Sleep(HANDSHAKE_TIMEOUT_MS);
                 }
                 else
                 {
-                    _bot.Log("[AVISO] Tentativa de conexão falhou ou demora na resposta.");
+                    _bot.Log("[AVISO] Botão de conexão não localizado na tela.");
                 }
+
+                attempts++;
+            }
+
+            // 4. Validação Final (Se após as tentativas não conectar, encerra o bot)
+            if (!secure)
+            {
+                _bot.Log("[FALLBACK] Falha persistente na conexão VPN.");
+                throw new CriticalException("Não foi possível estabelecer conexão segura após múltiplas tentativas.");
             }
         }
 
+        /// <summary>
+        /// Verifica se o asset de status conectado está visível.
+        /// </summary>
         private bool IsConnected(Bitmap screen)
         {
-            // Procura por um indicador visual de que a VPN está ON (ex: ícone verde ou botão 'Desconectar')
-            string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "assets", "nekobox.status_conectado.png");
+            string path = GetAssetPath("nekobox.status_conectado.png");
             if (!File.Exists(path)) return false;
 
             using var template = new Bitmap(path);
             return _vision.FindElement(screen, template) != null;
         }
 
-        // --- MÉTODOS DE MOTOR PADRONIZADOS ---
+        /// <summary>
+        /// Apenas detecta um elemento sem clicar (útil para checar erros).
+        /// </summary>
+        private bool DetectElement(Bitmap screen, string assetName)
+        {
+            string path = GetAssetPath(assetName);
+            if (!File.Exists(path)) return false;
+
+            using var template = new Bitmap(path);
+            return _vision.FindElement(screen, template) != null;
+        }
+
+        // --- MÉTODOS DE MOTOR (CORE) ---
+
         private bool DetectAndClick(Bitmap screen, string assetName, string label)
         {
-            string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "assets", assetName);
+            string path = GetAssetPath(assetName);
             if (!File.Exists(path)) return false;
 
             using var template = new Bitmap(path);
@@ -77,6 +120,7 @@ namespace AutomacaoApp.Services
 
             if (location != null)
             {
+                _bot.Log($"[VPN] Clicando em: {label}");
                 ClickAt(location.Value.X, location.Value.Y);
                 return true;
             }
@@ -86,8 +130,11 @@ namespace AutomacaoApp.Services
         private void ClickAt(int x, int y)
         {
             var bounds = System.Windows.Forms.Screen.PrimaryScreen!.Bounds;
+            
+            // Mapeamento para coordenadas absolutas do Windows (0 a 65535)
             double inputX = x * (65535.0 / bounds.Width);
             double inputY = y * (65535.0 / bounds.Height);
+
             _input.Mouse.MoveMouseTo(inputX, inputY);
             _input.Mouse.LeftButtonClick();
         }
@@ -101,6 +148,11 @@ namespace AutomacaoApp.Services
                 g.CopyFromScreen(Point.Empty, Point.Empty, bounds.Size);
             }
             return bmp;
+        }
+
+        private string GetAssetPath(string assetName)
+        {
+            return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "assets", assetName);
         }
     }
 }
