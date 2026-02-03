@@ -7,11 +7,9 @@ namespace AutomacaoApp.Services
 {
     public class MemucService
     {
+        // Caminho padrão do executável do MEmu
         private readonly string _exePath = @"C:\Program Files\Microvirt\MEmu\memuc.exe";
 
-        /// <summary>
-        /// Obtém a lista de todas as instâncias com PID atualizado para o VisionEngine.
-        /// </summary>
         public List<EmulatorInstance> GetInventory()
         {
             var instances = new List<EmulatorInstance>();
@@ -38,27 +36,12 @@ namespace AutomacaoApp.Services
                         Index = data[0],
                         Title = data[1],
                         IsRunning = data[3] == "1",
+                        // O PID é a 5ª coluna no listv2 do memuc
                         PID = int.TryParse(data[4], out int pid) ? pid : 0
                     });
                 }
             }
             return instances;
-        }
-
-        /// <summary>
-        /// Envia um clique diretamente para o Android via ADB (Não usa o mouse do Windows).
-        /// </summary>
-        public void SendClick(string index, int x, int y)
-        {
-            ExecuteCommand($"adb -i {index} shell input tap {x} {y}");
-        }
-
-        /// <summary>
-        /// Envia uma tecla do sistema (Ex: 3 = HOME, 4 = BACK).
-        /// </summary>
-        public void SendKey(string index, int keyCode)
-        {
-            ExecuteCommand($"adb -i {index} shell input keyevent {keyCode}");
         }
 
         public void StartInstance(int index) => ExecuteCommand($"start -i {index}");

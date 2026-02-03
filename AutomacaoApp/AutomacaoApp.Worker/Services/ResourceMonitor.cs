@@ -1,3 +1,4 @@
+using WindowsInput;
 using System.Diagnostics;
 
 namespace AutomacaoApp.Services
