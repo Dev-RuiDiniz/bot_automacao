@@ -1,6 +1,0 @@
-C:\Users\RUI FRANCISCO\Documents\GitHub\bot_automacao\AutomacaoApp\AutomacaoApp.Worker\obj\Debug\net8.0-windows\AutomacaoApp.Worker.csproj.AssemblyReference.cache
-C:\Users\RUI FRANCISCO\Documents\GitHub\bot_automacao\AutomacaoApp\AutomacaoApp.Worker\obj\Debug\net8.0-windows\AutomacaoApp.Worker.GeneratedMSBuildEditorConfig.editorconfig
-C:\Users\RUI FRANCISCO\Documents\GitHub\bot_automacao\AutomacaoApp\AutomacaoApp.Worker\obj\Debug\net8.0-windows\AutomacaoApp.Worker.AssemblyInfoInputs.cache
-C:\Users\RUI FRANCISCO\Documents\GitHub\bot_automacao\AutomacaoApp\AutomacaoApp.Worker\obj\Debug\net8.0-windows\AutomacaoApp.Worker.AssemblyInfo.cs
-C:\Users\RUI FRANCISCO\Documents\GitHub\bot_automacao\AutomacaoApp\AutomacaoApp.Worker\obj\Debug\net8.0-windows\AutomacaoApp.Worker.csproj.CoreCompileInputs.cache
-C:\Users\RUI FRANCISCO\Documents\GitHub\bot_automacao\AutomacaoApp\AutomacaoApp.Worker\obj\Debug\net8.0-windows\AutomacaoApp.Worker.sourcelink.json
