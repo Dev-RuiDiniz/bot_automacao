@@ -1,0 +1,203 @@
+{
+  "format": 1,
+  "restore": {
+    "C:\\Users\\RUI FRANCISCO\\Documents\\GitHub\\bot_automacao\\AutomacaoApp\\AutomacaoApp.Master\\AutomacaoApp.Master.csproj": {}
+  },
+  "projects": {
+    "C:\\Users\\RUI FRANCISCO\\Documents\\GitHub\\bot_automacao\\AutomacaoApp\\AutomacaoApp.Master\\AutomacaoApp.Master.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\Users\\RUI FRANCISCO\\Documents\\GitHub\\bot_automacao\\AutomacaoApp\\AutomacaoApp.Master\\AutomacaoApp.Master.csproj",
+        "projectName": "AutomacaoApp.Master",
+        "projectPath": "C:\\Users\\RUI FRANCISCO\\Documents\\GitHub\\bot_automacao\\AutomacaoApp\\AutomacaoApp.Master\\AutomacaoApp.Master.csproj",
+        "packagesPath": "C:\\Users\\RUI FRANCISCO\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\RUI FRANCISCO\\Documents\\GitHub\\bot_automacao\\AutomacaoApp\\AutomacaoApp.Master\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\RUI FRANCISCO\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0-windows"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0-windows7.0": {
+            "targetAlias": "net8.0-windows",
+            "projectReferences": {
+              "C:\\Users\\RUI FRANCISCO\\Documents\\GitHub\\bot_automacao\\AutomacaoApp\\AutomacaoApp.Worker\\AutomacaoApp.Worker.csproj": {
+                "projectPath": "C:\\Users\\RUI FRANCISCO\\Documents\\GitHub\\bot_automacao\\AutomacaoApp\\AutomacaoApp.Worker\\AutomacaoApp.Worker.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "10.0.100"
+      },
+      "frameworks": {
+        "net8.0-windows7.0": {
+          "targetAlias": "net8.0-windows",
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "downloadDependencies": [
+            {
+              "name": "Microsoft.AspNetCore.App.Ref",
+              "version": "[8.0.23, 8.0.23]"
+            },
+            {
+              "name": "Microsoft.NETCore.App.Host.win-x64",
+              "version": "[8.0.23, 8.0.23]"
+            },
+            {
+              "name": "Microsoft.NETCore.App.Ref",
+              "version": "[8.0.23, 8.0.23]"
+            },
+            {
+              "name": "Microsoft.WindowsDesktop.App.Ref",
+              "version": "[8.0.23, 8.0.23]"
+            }
+          ],
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.102/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "C:\\Users\\RUI FRANCISCO\\Documents\\GitHub\\bot_automacao\\AutomacaoApp\\AutomacaoApp.Worker\\AutomacaoApp.Worker.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\Users\\RUI FRANCISCO\\Documents\\GitHub\\bot_automacao\\AutomacaoApp\\AutomacaoApp.Worker\\AutomacaoApp.Worker.csproj",
+        "projectName": "AutomacaoApp.Worker",
+        "projectPath": "C:\\Users\\RUI FRANCISCO\\Documents\\GitHub\\bot_automacao\\AutomacaoApp\\AutomacaoApp.Worker\\AutomacaoApp.Worker.csproj",
+        "packagesPath": "C:\\Users\\RUI FRANCISCO\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\RUI FRANCISCO\\Documents\\GitHub\\bot_automacao\\AutomacaoApp\\AutomacaoApp.Worker\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\RUI FRANCISCO\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0-windows"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0-windows7.0": {
+            "targetAlias": "net8.0-windows",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "10.0.100"
+      },
+      "frameworks": {
+        "net8.0-windows7.0": {
+          "targetAlias": "net8.0-windows",
+          "dependencies": {
+            "GregsStack.InputSimulatorStandard": {
+              "target": "Package",
+              "version": "[1.3.5, )"
+            },
+            "Newtonsoft.Json": {
+              "target": "Package",
+              "version": "[13.0.3, )"
+            },
+            "OpenCvSharp4": {
+              "target": "Package",
+              "version": "[4.10.0.20240616, )"
+            },
+            "OpenCvSharp4.Extensions": {
+              "target": "Package",
+              "version": "[4.10.0.20240616, )"
+            },
+            "OpenCvSharp4.runtime.win": {
+              "target": "Package",
+              "version": "[4.10.0.20240616, )"
+            },
+            "System.Drawing.Common": {
+              "target": "Package",
+              "version": "[8.0.0, )"
+            },
+            "WindowsInput": {
+              "target": "Package",
+              "version": "[6.4.1, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "downloadDependencies": [
+            {
+              "name": "Microsoft.AspNetCore.App.Ref",
+              "version": "[8.0.23, 8.0.23]"
+            },
+            {
+              "name": "Microsoft.NETCore.App.Host.win-x64",
+              "version": "[8.0.23, 8.0.23]"
+            },
+            {
+              "name": "Microsoft.NETCore.App.Ref",
+              "version": "[8.0.23, 8.0.23]"
+            },
+            {
+              "name": "Microsoft.WindowsDesktop.App.Ref",
+              "version": "[8.0.23, 8.0.23]"
+            }
+          ],
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            },
+            "Microsoft.WindowsDesktop.App.WindowsForms": {
+              "privateAssets": "none"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.102/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    }
+  }
+}

@@ -1,3 +1,4 @@
 <Solution>
-  <Project Path="AutomacaoApp/AutomacaoApp.csproj" />
+  <Project Path="AutomacaoApp/AutomacaoApp.Worker/AutomacaoApp.Worker.csproj" />
+  <Project Path="AutomacaoApp/AutomacaoApp.Master/AutomacaoApp.Master.csproj" />
 </Solution>
